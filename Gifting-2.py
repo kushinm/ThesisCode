@@ -234,7 +234,7 @@ def runMany(num):
 			addData(pop,g,w)
 			pop = processPop(pop)
 			distArray = makeDistArray(pop)
-		#progress(w)
+		progress(w)
 			
 def progress(world):
     bar_len = 60
@@ -260,7 +260,7 @@ globalGroup = int(args['w'])
 attemptsToFind = 25				
 startPop = 100						
 gens = 100							
-worlds = 1
+worlds = 50
 
 numInteractions = int(args['n'])
 

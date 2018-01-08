@@ -245,11 +245,11 @@ def runMany(num):
 			lastSize = len(pop)
 			for i in range(numInteractions):
 				pop = runInteraction(pop,distArray)
-			#addData(pop,g,w)
-			addDataSTD(pop,g,w)
+			addData(pop,g,w)
+			#addDataSTD(pop,g,w)
 			pop = processPop(pop)
 			distArray = makeDistArray(pop)
-		#progress(w)
+		progress(w)
 			
 def progress(world):
     bar_len = 60
@@ -275,7 +275,7 @@ globalGroup = int(args['w'])
 attemptsToFind = 25				
 startPop = 100						
 gens = 100							
-worlds = 1
+worlds = 50
 
 numInteractions = int(args['n'])
 
@@ -285,9 +285,9 @@ poolMultiplier = int(args['m'])
 fitStart = int(args['f'])
 poolSize = int(args['s'])
 
-print "Generation,Mean_Fitness,Mean_BaseRate,Mean_KinChange,Mean_CoopChange,Mean_DefectChange,Mean_GroupChange,SD_Fitness,SD_BaseRate,SD_KinChange,SD_CoopChange,SD_DefectChange,SD_GroupChange"
+#print "Generation,Mean_Fitness,Mean_BaseRate,Mean_KinChange,Mean_CoopChange,Mean_DefectChange,Mean_GroupChange,SD_Fitness,SD_BaseRate,SD_KinChange,SD_CoopChange,SD_DefectChange,SD_GroupChange"
 
-#print "World,Generation,Fitness,BaseRate,KinChange,CoopChange,DefectChange,GroupChange"
+print "World,Generation,Fitness,BaseRate,KinChange,CoopChange,DefectChange,GroupChange"
 
 seed(77)
 runMany(worlds)

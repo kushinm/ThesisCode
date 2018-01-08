@@ -7,8 +7,8 @@ import numpy
 
 parser = argparse.ArgumentParser(description='Run iterrated prisoners dilemma model')
 parser.add_argument('-n', default=50, help='NumInteraction value')
-parser.add_argument('-w', default=0.75, help='Global Group value')
-parser.add_argument('-g', default=20, help='Number of groups')
+parser.add_argument('-w', default=0.5, help='Global Group value')
+parser.add_argument('-g', default=10, help='Number of groups')
 parser.add_argument('-r', default=3, help='Reward Payoff Value')
 parser.add_argument('-t', default=5, help='Temptation Payoff Value')
 parser.add_argument('-s', default=0, help='Sucker Payoff Value')
@@ -290,7 +290,7 @@ groups = []
 for x in range(0,numGroups):
 	groups.append(str(x))
 mutationRate = 0.75					
-globalGroup = int(args['w'])		
+globalGroup = float(args['w'])		
 attemptsToFind = 25				
 startPop = 100						
 gens = 100							

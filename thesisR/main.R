@@ -1,8 +1,8 @@
 library(ggplot2)
 library(dplyr)
 
-fileExtension <- "IPDResults/"
-fileName <- "brokenReward.txt"
+fileExtension <- "Gift Results/"
+fileName <- "giftingDefault.txt"
 
 ggData <- read.csv(paste(fileExtension,fileName,sep = ""),row.names=NULL)
 
@@ -55,7 +55,15 @@ ggplot(DF, aes(x = Generation, y = Mean_BaseRate))+
   geom_ribbon(aes(ymin=Mean_GroupChange-SD_GroupChange, ymax=Mean_GroupChange+SD_GroupChange, fill = "GroupChange"), alpha = 0.3)+
   labs(y = "Value")+
   ggtitle(fileName)#+
-  theme(legend.position="none")
+#  theme(legend.position="none")
+
+ggplot(DF, aes(x = Generation, y = Mean_CoopPercent))+
+  geom_line(aes(y = Mean_CoopPercent, color = "CoopPercent"))+
+  geom_ribbon(aes(ymin=Mean_CoopPercent-SD_CoopPercent, ymax=Mean_CoopPercent+SD_CoopPercent, fill = "CoopPercent"), alpha = 0.3)+
+  geom_line(aes(y = Mean_DefectPercent, color = "DefectPercent"))+
+  geom_ribbon(aes(ymin=Mean_DefectPercent-SD_DefectPercent, ymax=Mean_DefectPercent+SD_DefectPercent, fill = "DefectPercent"), alpha = 0.3)+
+  labs(y = "Value")+
+  ggtitle(paste(fileName,"Cooperation"))
 
 #ggplot(ggData, aes(x = gens, y = Fitness))+
 #  geom_line()

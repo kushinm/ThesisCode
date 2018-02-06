@@ -3,16 +3,21 @@ from recordtype import *
 from random import *
 from math import * 
 import sys
+import numpy
+from copy import deepcopy
+import os
 import string
+
+#seed(7)
 
 parser = argparse.ArgumentParser(description='Run iterrated prisoners dilemma model')
 parser.add_argument('-n', default=50, help='NumInteraction value')
-parser.add_argument('-w', default=0.75, help='Global Group value')
-parser.add_argument('-g', default=20, help='Number of groups')
-parser.add_argument('-a', default=3, help='Gift Amount Value')
-parser.add_argument('-m', default=1, help='Gift Multiplier Value')
-parser.add_argument('-f', default=50, help='Starting Fitness')
-
+parser.add_argument('-w', default=0.5, help='Global Group value')
+parser.add_argument('-g', default=10, help='Number of groups')
+parser.add_argument('-r', default=10, help='Reward Payoff Value')
+parser.add_argument('-t', default=0, help='Temptation Payoff Value')
+parser.add_argument('-s', default=0, help='Sucker Payoff Value')
+parser.add_argument('-p', default=0, help='Punishment payoff value')
 args = vars(parser.parse_args())
 
 Agent = recordtype("Agent","Lineage Fitness Group BaseRate CoopRates KinChange CoopChange DefectChange GroupChange Pos CoopTimes DefectTimes")
@@ -48,7 +53,6 @@ def coopFunc(val):
 	# to cooperate, so this should be fine?
 	if val < -140:
 		val = -140
-
 
 	#This function determines the probability from 0 to 1
 	# of cooperation occuring. Check desmos graphs for
@@ -90,7 +94,8 @@ def setup(numStart):
 		for x in range(0,numStart):
 			CoopRates.append(BaseRate)
 
-		pop.append(Agent(lin,fitStart,choice(groups),BaseRate,CoopRates,randTwo(),randTwo(),randTwo(),randTwo(),[random(),random()],0,0))
+		pop.append(Agent(lin,0,choice(groups),BaseRate,CoopRates,randTwo(),randTwo(),randTwo(),randTwo(),[random(),random()],0,0))
+		#pop.append(Agent(lin,0,choice(groups),BaseRate,CoopRates,0,0,0,0,[random(),random()],0,0))
 
 	#Changes CoopRates based on whether the other
 	# agents are in the same group and Lineage
@@ -150,7 +155,7 @@ def dist(pos1,pos2):
 	Y1 = pos1[1]
 	Y2 = pos2[1]
 
-	return sqrt((X1 - X2)**2 + (Y1 - Y2)**2)
+	return sqrt((X1 - X2)**2 + (Y1 - Y2)**2)	
 
 def runInteraction(pop,distArray):
 	popSize = len(pop)
@@ -190,33 +195,52 @@ def runInteraction(pop,distArray):
 						partner = pop[partnerInt]
 			count += 1
 
-		#Determines if the agent cooperates or not
+		#Randomly determines if agent shoudl cooperate or not based on their
+		# CoopRate for their partner
 		agentCoops = (random() <= coopFunc(agent.CoopRates[partnerInt]))
+		partnerCoops = (random() <= coopFunc(partner.CoopRates[x]))
 
-		if random() <= agent.CoopRates[partnerInt]:
-			#increases the number of tiems cooperated
+		#So based on who cooperates agents get rewarded
+		#If both cooperate they get the "together" reward (R)
+		#If one defects and the otehr cooperates and the other defects
+		# the defecting one gets the "tempt" reward (T) and the other gets
+		# the "sucker" reward (S)
+		#If they both defect then they both get the "punish" reward (P)
+		#
+		#If Reciprocal Selection is active then their CoopRates are changed
+		#Also now the number of times they cooperated and defected are increased
+		if agentCoops and partnerCoops:
+			partner.Fitness += together
+			agent.Fitness += together
+			partner.CoopTimes += 1
 			agent.CoopTimes += 1
-
-			#Gives the gift amount. If the agent doesn't have
-			# enough it gives what it has
-			if agent.Fitness < giftAmount:
-				agent.Fitness -= agent.Fitness
-				partner.Fitness += agent.Fitness * giftMultiplier
-			else:
-				agent.Fitness -= giftAmount
-				partner.Fitness += giftAmount * giftMultiplier
-
-			#If reciprocal selection is on then add coop change to partner
 			if RecipriSelection:
 				partner.CoopRates[x] += partner.CoopChange
-			#print "{} gave to {}!".format(x,partnerInt)
-		else:
-			#increases the number of tiems defected
+				agent.CoopRates[partnerInt] += agent.CoopChange
+		elif agentCoops and not partnerCoops:
+			partner.Fitness += tempt
+			agent.Fitness += suckers
+			partner.DefectTimes += 1
+			agent.CoopTimes += 1
+			if RecipriSelection:
+				partner.CoopRates[x] += partner.CoopChange
+				agent.CoopRates[partnerInt] += agent.DefectChange
+		elif not agentCoops and partnerCoops:
+			partner.Fitness += suckers
+			agent.Fitness += tempt
+			partner.CoopTimes += 1
 			agent.DefectTimes += 1
-			#If reciprocal selection is on then add Defect Change to partner
 			if RecipriSelection:
 				partner.CoopRates[x] += partner.DefectChange
-			#print "{} didn't gave to {}.".format(x,partnerInt)
+				agent.CoopRates[partnerInt] += agent.CoopChange
+		elif not agentCoops and not partnerCoops:
+			partner.Fitness += punish
+			agent.Fitness += punish
+			partner.DefectTimes += 1
+			agent.DefectTimes += 1
+			if RecipriSelection:
+				partner.CoopRates[x] += partner.DefectChange
+				agent.CoopRates[partnerInt] += agent.DefectChange
 
 	return pop
 
@@ -235,6 +259,7 @@ def processPop(pop):
 	# had any fitness which would be bad.
 	sumFit = (sum(fitnesses)*1.0)+0.0000000001
 
+
 	#Makes all the fitnesses sum to 1
 	for x in range(len(fitnesses)):
 		fitnesses[x] = fitnesses[x]/sumFit
@@ -248,11 +273,33 @@ def processPop(pop):
 			if desire > 0:
 				desire -= fitnesses[x]
 				if desire <= 0:
+					#childStats[x][g] += 1
 					newPop.append(makeNewAgent(pop[x],charIDs[s]))
 
-	#This sets the CoopRates for each agent in the new popualtion based on 
-	# the other agents in the popualtion
-	#And based on which other selections are active.
+	popSize = len(newPop)
+	meanKins = 0
+	meanCoops = 0
+	meanDefects = 0
+	meanGroups = 0
+	meanBase = 0
+	for agent in newPop:
+		meanKins += agent.KinChange
+		meanCoops += agent.CoopChange
+		meanDefects += agent.DefectChange
+		meanGroups += agent.GroupChange
+		meanBase += agent.BaseRate
+
+	meanKins = meanKins/popSize
+	meanCoops = meanCoops/popSize
+	meanDefects = meanDefects/popSize
+	meanGroups = meanGroups/popSize
+	meanBase = meanBase/popSize
+
+	popKins.append(meanKins)
+	popCoops.append(meanCoops)
+	popDefects.append(meanDefects)
+	popGroups.append(meanGroups)
+	popBase.append(meanBase)
 
 	for x in range(0,startPop):
 		agent = newPop[x]
@@ -270,7 +317,7 @@ def processPop(pop):
 
 def makeNewAgent(agent,newID):
 	#Makes a new agent from the old agent. Resets CoopTimes and DefectTimes, as well as fitness
-	newAgent = Agent(agent.Lineage+"."+newID,fitStart,agent.Group,agent.BaseRate,agent.CoopRates,agent.KinChange,agent.CoopChange,agent.DefectChange,agent.GroupChange,[random(),random()],0,0)
+	newAgent = Agent(agent.Lineage+"."+newID,0,agent.Group,agent.BaseRate,agent.CoopRates,agent.KinChange,agent.CoopChange,agent.DefectChange,agent.GroupChange,[random(),random()],0,0)
 
 	#Picks one mutation type if one occurs
 	# Mutates it using a Guassian curve
@@ -323,17 +370,24 @@ def addData(pop,gen,world):
 		Coop += agent.CoopChange/popSize
 		Defect += agent.DefectChange/popSize
 		Group += agent.GroupChange/popSize
-		CoopPercent += agent.CoopTimes/(numInteractions*popSize)
-		DefectPercent += agent.DefectTimes/(numInteractions*popSize)
+		CoopPercent += agent.CoopTimes/(numInteractions*2.0*popSize)
+		DefectPercent += agent.DefectTimes/(numInteractions*2.0*popSize)
 
 	print output.format(F = Fitness, B = Base, K = Kin, C = Coop, D = Defect, G = Group, E = gen, W = world, CT = CoopPercent, DT = DefectPercent)
+
+def addSummary(pop,g):
+
+	for i in range(len(pop)):
+		agent = pop[i]
+		agentFit = agent.Fitness
+		popFits[i][g] = agentFit
 
 
 def runMany(num):
 	#For each world....
 	for w in range(num):
 		#create a pop
-		pop = setup(startPop)
+		pop = deepcopy(corePop)
 		#find the distances 
 		distArray = makeDistArray(pop)
 		#for each generation...
@@ -344,58 +398,148 @@ def runMany(num):
 				#Change the popualtion based on the results of the interactions
 				pop = runInteraction(pop,distArray)
 			#Add the data to the output
-			addData(pop,g,w)
-			#process popualtion to make next gen
 			pop = processPop(pop)
-			#make a new dist array
 			distArray = makeDistArray(pop)
+			#process popualtion to make next gen
+		#addSummary(pop,w)
+		pop = deepcopy(corePop)
+			#make a new dist array
+			
 		#When you finish a world increment the progress bar
 		progress(w)
 			
 def progress(world):
 	#This prints a progress bar and doesn't print to the output 
 	# file by using stderr instead of stdout
-    bar_len = 60
-    filled_len = int(round(bar_len * world / float(worlds-1)))
+	world = world + 1
+	bar_len = 60
+	filled_len = int(round(bar_len * world / float(worlds)))
 
-    percents = round(100.0 * world / float(worlds-1), 1)
-    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+	percents = round(100.0 * world / float(worlds), 1)
+	bar = '=' * filled_len + '-' * (bar_len - filled_len)
 
-    sys.stderr.write('[%s] %s%s\r' % (bar, percents, '%'))
-    sys.stderr.flush()
+	sys.stderr.write('[%s] %s%s\r' % (bar, percents, '%'))
+	sys.stderr.flush()
 
-#Allows settign different types of selection
-KinSelection = True
-RecipriSelection = True
-GroupSelection = True
-						
-#Global variables									
+#Allows you to turn on or off different selection
+KinSelection = False
+RecipriSelection = False
+GroupSelection = False
+
+#Global variables			
 numGroups = int(args['g'])						
 groups = []					
 for x in range(0,numGroups):
 	groups.append(str(x))
-mutationRate = 1					
-globalGroup = int(args['w'])		
+mutationRate = 0.75					
+globalGroup = float(args['w'])		
 attemptsToFind = 25				
-startPop = 100						
-gens = 100							
-worlds = 50
+startPop = 100					
+gens = 5						
+worlds = 100
 
 numInteractions = int(args['n'])
 
-#Gift Rewards
-giftAmount = int(args['a'])
-giftMultiplier = int(args['m'])
-fitStart = int(args['f'])
+#IPD Rewards
+suckers = int(args['s'])
+tempt = int(args['t'])
+punish = int(args['p'])
+together = int(args['r'])
 
+#print "World,Generation,Fitness,BaseRate,KinChange,CoopChange,DefectChange,GroupChange,CoopPercent,DefectPercent"
 
-print "World,Generation,Fitness,BaseRate,KinChange,CoopChange,DefectChange,GroupChange,CoopPercent,DefectPercent"
+corePop = setup(startPop)
+# popFits = [[0 for x in range(worlds)] for y in range(startPop)]
+popKins = []
+popCoops = []
+popDefects = []
+popGroups = []
+popBase = []
+# childStats = [[0 for x in range(worlds)] for y in range(startPop)]
+# standardDevArray = []
+# childStdArray = []
 
-seed(7)
-#Runs the thing
+#Run the trials
 runMany(worlds)
+# minMean = 99999
+# maxMean = 0
+# minChildren = 101
+# maxChildren = -1
 
+# for p in popFits:
+# 	array = numpy.array(p)
+# 	mean = numpy.mean(array)
+# 	std = numpy.std(array)
+# 	#print mean,std
+# 	standardDevArray.append(std)
+# 	if(mean < minMean):
+# 		minMean = mean
+# 	if(mean > maxMean):
+# 		maxMean = mean
 
+# for c in childStats:
+# 	childArray = numpy.array(c)
+# 	childMean = numpy.mean(childArray)
+# 	childStd = numpy.std(childArray)
+# 	childStdArray.append(childStd)
+# 	if(childMean < minChildren):
+# 		minChildren = childMean
+# 	if(childMean > maxChildren):
+# 		maxChildren = childMean
 
+popKins = numpy.array(popKins)
+popCoops = numpy.array(popCoops)
+popDefects = numpy.array(popDefects)
+popGroups = numpy.array(popGroups)
+popBase = numpy.array(popBase)
+
+baseMean = numpy.mean(popBase)
+baseSD = numpy.std(popBase)
+kinMean = numpy.mean(popKins)
+kinSD = numpy.std(popKins)
+coopMean = numpy.mean(popCoops)
+coopSD = numpy.std(popCoops)
+defectMean = numpy.mean(popDefects)
+defectSD = numpy.std(popDefects)
+groupMean = numpy.mean(popGroups)
+groupSD = numpy.std(popGroups)
+
+# print
+# print "Final Stats"
+# stdArray = numpy.array(standardDevArray)
+# childStdArray = numpy.array(childStdArray)
+# print "SD Mean:",numpy.mean(stdArray),"SD std:",numpy.std(stdArray)
+# print "Min Mean Fitness:",minMean,"Max Fitness",maxMean
+# print "\n"
+# print "SD Child Mean:",numpy.mean(childStdArray),"SD Child std:",numpy.std(childStdArray)
+# print "Min Mean Children:",minChildren,"Max Mean Children:",maxChildren
+# print "\n"
+# print "Base Mean:",baseMean,"Base SD:",baseSD
+# print "Base Max:",max(popBase),"Base Min:",min(popBase)
+# print 
+# print "Kin Mean:",kinMean,"Kin SD:",kinSD
+# print "Kin Max:",max(popKins),"Kin Min:",min(popKins)
+# print 
+# print "Coop Mean:",coopMean,"Coop SD:",coopSD
+# print "Coop Max:",max(popCoops),"Coop Min:",min(popCoops)
+# print 
+# print "Defect Mean:",defectMean,"Defect SD:",defectSD
+# print "Defect Max:",max(popDefects),"Defect Min:",min(popDefects)
+# print 
+# print "Group Mean:",groupMean,"Group SD:",groupSD
+# print "Group Max:",max(popGroups),"Group Min:",min(popGroups)
+# print
+
+rOut = "{Base},{Kin},{Coop},{Defect},{Group}"
+print "Base,Kin,Coop,Defect,Group"
+for i in range(worlds):
+	Base = popBase[i]
+	Kin = popKins[i]
+	Coop = popCoops[i]
+	Defect = popDefects[i]
+	Group = popGroups[i]
+	print rOut.format(Base=Base,Kin=Kin,Coop=Coop,Defect=Defect,Group=Group)
+
+os.system('say "DING"')
 
 

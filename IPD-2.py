@@ -3,9 +3,10 @@ from recordtype import *
 from random import *
 from math import * 
 import sys
+import string
 
 parser = argparse.ArgumentParser(description='Run iterrated prisoners dilemma model')
-parser.add_argument('-n', default=100, help='NumInteraction value')
+parser.add_argument('-n', default=1, help='NumInteraction value')
 parser.add_argument('-w', default=0.5, help='Global Group value')
 parser.add_argument('-g', default=10, help='Number of groups')
 parser.add_argument('-r', default=3, help='Reward Payoff Value')
@@ -15,6 +16,13 @@ parser.add_argument('-p', default=1, help='Punishment payoff value')
 args = vars(parser.parse_args())
 
 Agent = recordtype("Agent","Lineage Fitness Group BaseRate CoopRates KinChange CoopChange DefectChange GroupChange Pos CoopTimes DefectTimes")
+
+letters = list(string.ascii_uppercase)
+charIDs = []
+
+for L in letters:
+	for l in letters:
+		charIDs.append(L+l)
 
 def randTwo():
 	#Gets random float between -1 and 1
@@ -34,6 +42,7 @@ def guassMutate(val):
 
 	return newVal
 
+
 def coopFunc(val):
 	#This is a bit of a cheat here as if val < -140 the exponent 
 	# is to large and this crashes. But at -140 they are still never going
@@ -41,12 +50,32 @@ def coopFunc(val):
 	if val < -140:
 		val = -140
 
-
 	#This function determines the probability from 0 to 1
 	# of cooperation occuring. Check desmos graphs for
 	# better reasons or pictures
 	newVal = 1/(1+e**((-5*val)+2.5))
 	return newVal
+
+def compKin(mainLin,compLin):
+	#This compares the lianges of individuals to see when they last
+	# had a common ancestor. I do the split(".") so as to get an array 
+	# and to make it easier to read later.
+	mainLin = mainLin.split(".")
+	compLin = compLin.split(".")
+	if mainLin[0] != compLin[0]:
+		return 100
+
+	same = 0
+
+	length = len(mainLin)
+
+	for x in range(length):
+		if mainLin[x] == compLin[x]:
+			same += 1
+		else:
+			break
+	
+	return length-same
 
 def setup(numStart):
 	#Makes a whole new beginnign population
@@ -57,7 +86,7 @@ def setup(numStart):
 	for x in range(0,numStart):
 		BaseRate = randTwo()
 		CoopRates = []
-		lin = x
+		lin = charIDs[x]
 		for x in range(0,numStart):
 			CoopRates.append(BaseRate)
 
@@ -70,8 +99,8 @@ def setup(numStart):
 		for y in range(0,numStart):
 			partner = pop[y]
 			coopChance = agent.CoopRates[y]
-			if KinSelection and partner.Lineage == agent.Lineage:
-				coopChance += agent.KinChange
+			if KinSelection and x != y:
+				coopChance += agent.KinChange/compKin(agent.Lineage,partner.Lineage)
 			if GroupSelection and partner.Group == agent.Group:
 				coopChance += agent.GroupChange
 
@@ -239,7 +268,7 @@ def processPop(pop):
 			if desire > 0:
 				desire -= fitnesses[x]
 				if desire <= 0:
-					newPop.append(makeNewAgent(pop[x]))
+					newPop.append(makeNewAgent(pop[x],charIDs[s]))
 
 	#This sets the CoopRates for each agent in the new popualtion based on 
 	# the other agents in the popualtion
@@ -249,8 +278,8 @@ def processPop(pop):
 		for y in range(0,startPop):
 			partner = newPop[y]
 			coopChance = agent.CoopRates[y]
-			if KinSelection and partner.Lineage == agent.Lineage:
-				coopChance += agent.KinChange
+			if KinSelection and x != y:
+				coopChance += agent.KinChange/compKin(agent.Lineage,partner.Lineage)
 			if GroupSelection and partner.Group == agent.Group:
 				coopChance += agent.GroupChange
 
@@ -258,9 +287,9 @@ def processPop(pop):
 
 	return newPop
 
-def makeNewAgent(agent):
+def makeNewAgent(agent,newID):
 	#Makes a new agent from the old agent. Resets CoopTimes and DefectTimes, as well as fitness
-	newAgent = Agent(agent.Lineage,0,agent.Group,agent.BaseRate,agent.CoopRates,agent.KinChange,agent.CoopChange,agent.DefectChange,agent.GroupChange,[random(),random()],0,0)
+	newAgent = Agent(agent.Lineage+"."+newID,0,agent.Group,agent.BaseRate,agent.CoopRates,agent.KinChange,agent.CoopChange,agent.DefectChange,agent.GroupChange,[random(),random()],0,0)
 
 	#Picks one mutation type if one occurs
 	# Mutates it using a Guassian curve
@@ -318,7 +347,6 @@ def addData(pop,gen,world):
 
 	print output.format(F = Fitness, B = Base, K = Kin, C = Coop, D = Defect, G = Group, E = gen, W = world, CT = CoopPercent, DT = DefectPercent)
 
-
 def runMany(num):
 	#For each world....
 	for w in range(num):
@@ -328,6 +356,7 @@ def runMany(num):
 		distArray = makeDistArray(pop)
 		#for each generation...
 		for g in range(gens):
+			shuffle(charIDs)
 			#run the right number of interactions for each agent
 			for i in range(numInteractions):
 				#Change the popualtion based on the results of the interactions
@@ -340,23 +369,24 @@ def runMany(num):
 			distArray = makeDistArray(pop)
 		#When you finish a world increment the progress bar
 		progress(w)
+
 			
 def progress(world):
 	#This prints a progress bar and doesn't print to the output 
 	# file by using stderr instead of stdout
     bar_len = 60
-    filled_len = int(round(bar_len * world / float(worlds-1)))
+    filled_len = int(round(bar_len * world / float(worlds)))
 
-    percents = round(100.0 * world / float(worlds-1), 1)
+    percents = round(100.0 * world / float(worlds), 1)
     bar = '=' * filled_len + '-' * (bar_len - filled_len)
 
     sys.stderr.write('[%s] %s%s\r' % (bar, percents, '%'))
     sys.stderr.flush()
 
 #Allows you to turn on or off different selection
-KinSelection = False
+KinSelection = True
 RecipriSelection = True
-GroupSelection = False
+GroupSelection = True
 
 #Global variables			
 numGroups = int(args['g'])						
@@ -366,8 +396,8 @@ for x in range(0,numGroups):
 mutationRate = 0.75					
 globalGroup = float(args['w'])		
 attemptsToFind = 25				
-startPop = 25						
-gens = 100							
+startPop = 50						
+gens = 50							
 worlds = 50
 
 numInteractions = int(args['n'])
@@ -384,6 +414,8 @@ print "World,Generation,Fitness,BaseRate,KinChange,CoopChange,DefectChange,Group
 seed(7)
 #Run the trials
 runMany(worlds)
+
+
 
 
 

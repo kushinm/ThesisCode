@@ -1,12 +1,12 @@
 library(ggplot2)
 library(dplyr)
 
-fileExtension <- "Gift Results/"
-fileName <- "giftingDefault.txt"
+fileExtension <- "IPD Results/"
+fileName <- "defaultIPD.txt"
 
 ggData <- read.csv(paste(fileExtension,fileName,sep = ""),row.names=NULL)
 
-#ggData[ggData$World==1,]
+#ggData <- ggData[ggData$World==2,]
 
 ggMeans <- ggData %>% group_by(Generation) %>% summarise_each(funs(mean))
 ggSDs <- ggData %>% group_by(Generation) %>% summarise_each(funs(sd))

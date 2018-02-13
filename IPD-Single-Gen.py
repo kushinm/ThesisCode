@@ -14,10 +14,10 @@ parser = argparse.ArgumentParser(description='Run iterrated prisoners dilemma mo
 parser.add_argument('-n', default=50, help='NumInteraction value')
 parser.add_argument('-w', default=0.5, help='Global Group value')
 parser.add_argument('-g', default=10, help='Number of groups')
-parser.add_argument('-r', default=10, help='Reward Payoff Value')
-parser.add_argument('-t', default=0, help='Temptation Payoff Value')
+parser.add_argument('-r', default=3, help='Reward Payoff Value')
+parser.add_argument('-t', default=5, help='Temptation Payoff Value')
 parser.add_argument('-s', default=0, help='Sucker Payoff Value')
-parser.add_argument('-p', default=0, help='Punishment payoff value')
+parser.add_argument('-p', default=1, help='Punishment payoff value')
 args = vars(parser.parse_args())
 
 Agent = recordtype("Agent","Lineage Fitness Group BaseRate CoopRates KinChange CoopChange DefectChange GroupChange Pos CoopTimes DefectTimes")
@@ -387,7 +387,7 @@ def runMany(num):
 	#For each world....
 	for w in range(num):
 		#create a pop
-		pop = deepcopy(corePop)
+		pop = setup(startPop)
 		#find the distances 
 		distArray = makeDistArray(pop)
 		#for each generation...
@@ -402,7 +402,6 @@ def runMany(num):
 			distArray = makeDistArray(pop)
 			#process popualtion to make next gen
 		#addSummary(pop,w)
-		pop = deepcopy(corePop)
 			#make a new dist array
 			
 		#When you finish a world increment the progress bar
@@ -422,9 +421,9 @@ def progress(world):
 	sys.stderr.flush()
 
 #Allows you to turn on or off different selection
-KinSelection = False
-RecipriSelection = False
-GroupSelection = False
+KinSelection = True
+RecipriSelection = True
+GroupSelection = True
 
 #Global variables			
 numGroups = int(args['g'])						
@@ -435,7 +434,7 @@ mutationRate = 0.75
 globalGroup = float(args['w'])		
 attemptsToFind = 25				
 startPop = 100					
-gens = 5						
+gens = 1						
 worlds = 100
 
 numInteractions = int(args['n'])
